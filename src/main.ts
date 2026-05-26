@@ -569,59 +569,59 @@ const createPdf = () => {
 
   const rows = getPrintableRows();
   const pageWidth = pdf.internal.pageSize.getWidth();
-  const left = 12;
-  const right = pageWidth - 12;
+  const left = 10;
+  const right = pageWidth - 10;
   const contentWidth = right - left;
-  let y = 12;
+  let y = 9;
 
   pdf.setDrawColor(23, 49, 73);
-  pdf.setLineWidth(0.45);
-  pdf.roundedRect(left, y, contentWidth, 23, 4, 4);
+  pdf.setLineWidth(0.55);
+  pdf.roundedRect(left, y, contentWidth, 28, 4, 4);
 
   pdf.setFont("times", "bold");
-  pdf.setFontSize(17);
+  pdf.setFontSize(19.5);
   pdf.setTextColor(14, 36, 56);
-  pdf.text("CENTRO RESPIRATORIO INTEGRAL", pageWidth / 2, y + 8.5, {
+  pdf.text("CENTRO RESPIRATORIO INTEGRAL", pageWidth / 2, y + 10, {
     align: "center"
   });
 
   pdf.setFont("times", "normal");
-  pdf.setFontSize(9.5);
+  pdf.setFontSize(10.5);
   pdf.setTextColor(54, 88, 116);
-  pdf.text("Centro de diagnostico y evaluacion respiratoria", pageWidth / 2, y + 14, {
+  pdf.text("Centro de diagnostico y evaluacion respiratoria", pageWidth / 2, y + 17, {
     align: "center"
   });
 
   pdf.setFont("times", "bold");
-  pdf.setFontSize(9.2);
+  pdf.setFontSize(10.2);
   pdf.setTextColor(23, 41, 55);
-  pdf.text("Marconi 147 · Tel. 02657-705270 · Villa Mercedes (San Luis)", pageWidth / 2, y + 19, {
+  pdf.text("Marconi 147 - Tel. 02657-705270 - Villa Mercedes (San Luis)", pageWidth / 2, y + 22.5, {
     align: "center"
   });
 
   pdf.setDrawColor(41, 80, 111);
   pdf.setLineWidth(0.2);
-  pdf.line(left + 7, y + 21, right - 7, y + 21);
+  pdf.line(left + 8, y + 24.5, right - 8, y + 24.5);
 
-  y += 31;
+  y += 39;
 
   rows.forEach(([label, value]) => {
     pdf.setFont("times", "bold");
-    pdf.setFontSize(10.7);
+    pdf.setFontSize(11.9);
     pdf.setTextColor(16, 40, 63);
     pdf.text(`${label}:`, left, y);
 
     const lines = pdf.splitTextToSize(value || " ", contentWidth);
     pdf.setFont("times", "bold");
-    pdf.setFontSize(10.4);
+    pdf.setFontSize(11.5);
     pdf.setTextColor(27, 47, 63);
-    pdf.text(lines, left, y + 6.2);
+    pdf.text(lines, left, y + 7.3);
 
-    const blockHeight = 11 + Math.max(0, lines.length - 1) * 4.6;
+    const blockHeight = 13.5 + Math.max(0, lines.length - 1) * 5.2;
     pdf.setDrawColor(209, 219, 229);
     pdf.setLineWidth(0.2);
     pdf.line(left, y + blockHeight, right, y + blockHeight);
-    y += blockHeight + 5.5;
+    y += blockHeight + 7;
   });
 
   return pdf;
