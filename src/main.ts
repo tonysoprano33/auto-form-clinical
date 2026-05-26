@@ -9,6 +9,7 @@ import {
   TableCell,
   TableRow,
   TextRun,
+  VerticalAlign,
   WidthType
 } from "docx";
 
@@ -27,16 +28,6 @@ type PatientForm = {
   visitDate: string;
 };
 
-type SavedRecord = PatientForm & {
-  id: string;
-  savedAt: string;
-};
-
-type PatientProfile = PatientForm & {
-  id: string;
-  updatedAt: string;
-};
-
 type AppConfig = {
   insurances: string[];
   doctors: string[];
@@ -45,12 +36,9 @@ type AppConfig = {
 type AppState = {
   form: PatientForm;
   config: AppConfig;
-  recentRecords: SavedRecord[];
-  profiles: PatientProfile[];
 };
 
 const STORAGE_KEY = "clinica-caratula-state";
-const RECENT_LIMIT = 12;
 
 const defaultConfig: AppConfig = {
   insurances: [
@@ -151,9 +139,7 @@ const calculateAge = (birthDate: string, visitDate: string): string => {
 const loadState = (): AppState => {
   const fallbackState: AppState = {
     form: defaultForm(),
-    config: defaultConfig,
-    recentRecords: [],
-    profiles: []
+    config: defaultConfig
   };
 
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -168,30 +154,8 @@ const loadState = (): AppState => {
       doctors: mergeUniqueValues(parsed.config?.doctors, defaultConfig.doctors)
     };
 
-    const recentRecords = Array.isArray(parsed.recentRecords)
-      ? parsed.recentRecords.slice(0, RECENT_LIMIT).map((record) => ({
-          ...defaultForm(),
-          ...record,
-          smoker: (record.smoker === "Si" ? "Si" : "No") as YesNo,
-          id: record.id || crypto.randomUUID(),
-          savedAt: record.savedAt || new Date().toISOString()
-        }))
-      : [];
-
-    const profiles = Array.isArray(parsed.profiles)
-      ? parsed.profiles.map((profile) => ({
-          ...defaultForm(),
-          ...profile,
-          smoker: (profile.smoker === "Si" ? "Si" : "No") as YesNo,
-          id: profile.id || crypto.randomUUID(),
-          updatedAt: profile.updatedAt || new Date().toISOString()
-        }))
-      : [];
-
     return {
       config,
-      recentRecords,
-      profiles,
       form: {
         ...defaultForm(),
         ...parsed.form,
@@ -237,7 +201,7 @@ const renderApp = () => {
             <p class="eyebrow">Clinica respiratoria</p>
             <h1>Caratula lista para imprimir</h1>
             <p class="panel-copy">
-              Formulario rapido, letra clara y perfiles reutilizables para no cargar dos veces lo mismo.
+              Formulario amplio, rapido y pensado para recepcion. Todo queda guardado localmente en este navegador.
             </p>
           </div>
           <button id="open-settings" class="ghost-button" type="button">Editar listas</button>
@@ -247,10 +211,9 @@ const renderApp = () => {
           <label class="field field-wide">
             <span>Apellido y nombre</span>
             <input id="fullName" name="fullName" type="text" maxlength="90" placeholder="Ej: Perez, Marta Alicia" />
-            <div id="profile-suggestions" class="suggestion-list hidden"></div>
           </label>
 
-          <div class="field-grid">
+          <div class="field-grid field-grid-three">
             <label class="field">
               <span>DNI</span>
               <input id="dni" name="dni" type="text" inputmode="numeric" maxlength="10" placeholder="12.345.678" />
@@ -265,7 +228,7 @@ const renderApp = () => {
             </label>
           </div>
 
-          <div class="field-grid">
+          <div class="field-grid field-grid-three">
             <label class="field">
               <span>Fumador</span>
               <select id="smoker" name="smoker">
@@ -288,7 +251,7 @@ const renderApp = () => {
             <input id="address" name="address" type="text" maxlength="120" placeholder="Calle, numero y barrio" />
           </label>
 
-          <div class="field-grid">
+          <div class="field-grid field-grid-two field-grid-emphasis">
             <label class="field">
               <span>Obra social</span>
               <div class="inline-pick">
@@ -308,25 +271,13 @@ const renderApp = () => {
           </div>
 
           <div class="action-row">
-            <button id="save-button" class="secondary-button" type="button">Guardar ficha</button>
             <button id="save-print-button" class="primary-button" type="button">Guardar e imprimir</button>
-            <button id="print-button" class="primary-button" type="button">Imprimir</button>
+            <button id="print-button" class="secondary-button" type="button">Imprimir</button>
             <button id="docx-button" class="secondary-button" type="button">Descargar Word</button>
             <button id="reset-button" class="ghost-button" type="button">Nueva ficha</button>
           </div>
           <p id="status-message" class="helper-copy">Enter avanza al siguiente campo. En el ultimo campo, Enter abre la impresion.</p>
-          <p class="storage-note">Esta version guarda fichas y listas solo en este navegador, usando el almacenamiento local de la computadora.</p>
         </form>
-
-        <section class="recent-panel">
-          <div class="recent-header">
-            <div>
-              <p class="eyebrow">Fichas recientes</p>
-              <h2>Pacientes guardados</h2>
-            </div>
-          </div>
-          <div id="recent-records" class="recent-list"></div>
-        </section>
       </section>
 
       <section class="panel panel-preview">
@@ -335,10 +286,14 @@ const renderApp = () => {
           <span class="preview-hint">Salida A4 lista para imprimir</span>
         </div>
         <article class="print-sheet" id="print-sheet">
-          <header class="sheet-header">
-            <div class="sheet-header-inner">
+          <header class="sheet-header sheet-header-pro">
+            <div class="sheet-badge">
+              <span>CRI</span>
+            </div>
+            <div class="sheet-header-copy">
               <h2>CENTRO RESPIRATORIO INTEGRAL</h2>
-              <p>MARCONI 147 - TEL. 02657-705270 - VILLA MERCEDES (S.L.)</p>
+              <p>Centro de diagnostico y evaluacion respiratoria</p>
+              <p>Marconi 147 · Tel. 02657-705270 · Villa Mercedes (San Luis)</p>
             </div>
           </header>
 
@@ -478,32 +433,6 @@ const refreshTagLists = () => {
     .join("");
 };
 
-const renderRecentRecords = () => {
-  const container = getInput<HTMLDivElement>("recent-records");
-  if (!state.recentRecords.length) {
-    container.innerHTML = `<p class="empty-state">Todavia no hay fichas guardadas.</p>`;
-    return;
-  }
-
-  container.innerHTML = state.recentRecords
-    .map(
-      (record) => `
-        <article class="recent-card">
-          <div class="recent-card-copy">
-            <strong>${escapeHtml(record.fullName || "Sin nombre")}</strong>
-            <span>DNI: ${escapeHtml(record.dni || "-")}</span>
-            <span>Fecha: ${escapeHtml(record.visitDate || "-")}</span>
-          </div>
-          <div class="recent-card-actions">
-            <button type="button" class="secondary-button small-button" data-action="load-record" data-id="${record.id}">Cargar</button>
-            <button type="button" class="ghost-button small-button" data-action="delete-record" data-id="${record.id}">Quitar</button>
-          </div>
-        </article>
-      `
-    )
-    .join("");
-};
-
 const updateDerivedAge = () => {
   state.form.age = calculateAge(state.form.birthDate, state.form.visitDate);
   getInput<HTMLInputElement>("age").value = state.form.age;
@@ -517,48 +446,6 @@ const addDynamicOption = (value: string, target: "insurances" | "doctors") => {
   }
 };
 
-const isFormUseful = (): boolean => state.form.fullName.trim().length > 0;
-
-const findMatchingProfiles = (query: string): PatientProfile[] => {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) {
-    return [];
-  }
-
-  const queryDigits = normalizedQuery.replace(/\D/g, "");
-  return state.profiles
-    .filter((profile) => {
-      const byName = profile.fullName.toLowerCase().includes(normalizedQuery);
-      const byDni =
-        queryDigits.length >= 3 &&
-        profile.dni.replace(/\D/g, "").startsWith(queryDigits);
-      return byName || byDni;
-    })
-    .slice(0, 6);
-};
-
-const renderProfileSuggestions = (query: string) => {
-  const matches = findMatchingProfiles(query);
-  if (!matches.length) {
-    hideSuggestions("profile-suggestions");
-    return;
-  }
-
-  showSuggestions(
-    "profile-suggestions",
-    matches
-      .map(
-        (profile) => `
-          <button type="button" class="suggestion-item profile-item" data-action="load-profile" data-id="${profile.id}">
-            <strong>${escapeHtml(profile.fullName || "Sin nombre")}</strong>
-            <span>DNI ${escapeHtml(profile.dni || "-")} · ${escapeHtml(profile.phone || "Sin telefono")}</span>
-          </button>
-        `
-      )
-      .join("")
-  );
-};
-
 const renderTextSuggestions = (
   targetId: string,
   items: string[],
@@ -568,7 +455,7 @@ const renderTextSuggestions = (
   const normalized = query.trim().toLowerCase();
   const filtered = items
     .filter((item) => item.toLowerCase().includes(normalized))
-    .slice(0, 8);
+    .slice(0, 10);
 
   if (!filtered.length) {
     hideSuggestions(targetId);
@@ -587,82 +474,6 @@ const renderTextSuggestions = (
       )
       .join("")
   );
-};
-
-const loadProfileIntoForm = (profile: PatientProfile) => {
-  state.form = {
-    ...profile,
-    visitDate: createToday()
-  };
-  syncFormValues();
-  updateDerivedAge();
-  syncPreview();
-  saveState();
-  hideSuggestions("profile-suggestions");
-  setStatus("Perfil del paciente cargado.");
-};
-
-const upsertProfile = () => {
-  if (!state.form.fullName.trim() && !state.form.dni.trim()) {
-    return;
-  }
-
-  const dniDigits = state.form.dni.replace(/\D/g, "");
-  const normalizedName = state.form.fullName.trim().toLowerCase();
-  const existingIndex = state.profiles.findIndex((profile) => {
-    const profileDniDigits = profile.dni.replace(/\D/g, "");
-    if (dniDigits && profileDniDigits) {
-      return dniDigits === profileDniDigits;
-    }
-    return normalizedName.length > 0 && profile.fullName.trim().toLowerCase() === normalizedName;
-  });
-
-  const nextProfile: PatientProfile = {
-    ...state.form,
-    id: existingIndex >= 0 ? state.profiles[existingIndex].id : crypto.randomUUID(),
-    updatedAt: new Date().toISOString()
-  };
-
-  if (existingIndex >= 0) {
-    state.profiles.splice(existingIndex, 1, nextProfile);
-  } else {
-    state.profiles.unshift(nextProfile);
-  }
-};
-
-const persistCurrentRecord = () => {
-  if (!isFormUseful()) {
-    setStatus("Completa al menos apellido y nombre antes de guardar.");
-    return false;
-  }
-
-  addDynamicOption(state.form.insurance, "insurances");
-  addDynamicOption(state.form.referralDoctor, "doctors");
-  upsertProfile();
-
-  const normalized: SavedRecord = {
-    ...state.form,
-    id: crypto.randomUUID(),
-    savedAt: new Date().toISOString()
-  };
-
-  state.recentRecords = [
-    normalized,
-    ...state.recentRecords.filter(
-      (record) =>
-        !(
-          record.fullName === normalized.fullName &&
-          record.dni === normalized.dni &&
-          record.visitDate === normalized.visitDate
-        )
-    )
-  ].slice(0, RECENT_LIMIT);
-
-  renderRecentRecords();
-  refreshTagLists();
-  saveState();
-  setStatus("Ficha guardada en recientes.");
-  return true;
 };
 
 const quickAddCurrentValue = (target: "insurances" | "doctors") => {
@@ -713,7 +524,6 @@ const resetForm = () => {
   syncFormValues();
   syncPreview();
   saveState();
-  hideSuggestions("profile-suggestions");
   hideSuggestions("insurance-suggestions");
   hideSuggestions("doctor-suggestions");
   setStatus("Ficha nueva lista para cargar.");
@@ -767,33 +577,88 @@ const createDocx = async () => {
               new TableRow({
                 children: [
                   new TableCell({
+                    width: { size: 20, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
                     borders: {
-                      top: { style: BorderStyle.SINGLE, size: 8, color: "1F2937" },
-                      bottom: { style: BorderStyle.SINGLE, size: 8, color: "1F2937" },
-                      left: { style: BorderStyle.SINGLE, size: 8, color: "1F2937" },
-                      right: { style: BorderStyle.SINGLE, size: 8, color: "1F2937" }
+                      top: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
+                      bottom: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
+                      left: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
+                      right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }
                     },
                     children: [
                       new Paragraph({
                         alignment: AlignmentType.CENTER,
-                        spacing: { before: 160, after: 120 },
+                        spacing: { before: 220, after: 100 },
                         children: [
                           new TextRun({
-                            text: "CENTRO RESPIRATORIO INTEGRAL",
+                            text: "CRI",
                             bold: true,
-                            size: 30,
+                            size: 44,
+                            color: "15324A",
                             font: "Cambria"
                           })
                         ]
                       }),
                       new Paragraph({
                         alignment: AlignmentType.CENTER,
-                        spacing: { after: 180 },
+                        spacing: { after: 220 },
                         children: [
                           new TextRun({
-                            text: "MARCONI 147 - TEL. 02657-705270 - VILLA MERCEDES (S.L.)",
+                            text: "Respiratorio",
+                            italics: true,
+                            size: 18,
+                            color: "48657D",
+                            font: "Cambria"
+                          })
+                        ]
+                      })
+                    ]
+                  }),
+                  new TableCell({
+                    width: { size: 80, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
+                      bottom: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
+                      right: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
+                      left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }
+                    },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        spacing: { before: 160, after: 70 },
+                        children: [
+                          new TextRun({
+                            text: "CENTRO RESPIRATORIO INTEGRAL",
+                            bold: true,
+                            size: 30,
+                            color: "12263B",
+                            font: "Cambria"
+                          })
+                        ]
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 70 },
+                        children: [
+                          new TextRun({
+                            text: "Centro de diagnostico y evaluacion respiratoria",
+                            italics: true,
+                            size: 20,
+                            color: "48657D",
+                            font: "Cambria"
+                          })
+                        ]
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 160 },
+                        children: [
+                          new TextRun({
+                            text: "Marconi 147 - Tel. 02657-705270 - Villa Mercedes (San Luis)",
                             bold: true,
                             size: 22,
+                            color: "12263B",
                             font: "Cambria"
                           })
                         ]
@@ -806,23 +671,25 @@ const createDocx = async () => {
           }),
           ...rows.flatMap(([label, value]) => [
             new Paragraph({
-              spacing: { before: 280, after: 30 },
+              spacing: { before: 250, after: 34 },
               children: [
                 new TextRun({
                   text: `${label}:`,
                   bold: true,
                   underline: {},
                   size: 24,
+                  color: "12263B",
                   font: "Cambria"
                 })
               ]
             }),
             new Paragraph({
-              spacing: { after: 20 },
+              spacing: { after: 18 },
               children: [
                 new TextRun({
                   text: value || " ",
                   size: 24,
+                  color: "1F2D3A",
                   font: "Cambria"
                 })
               ]
@@ -872,11 +739,6 @@ const setupFieldListeners = () => {
       updateDerivedAge();
       syncPreview();
 
-      if (field === "fullName" || field === "dni") {
-        const name = field === "fullName" ? nextValue : getInput<HTMLInputElement>("fullName").value;
-        const dni = field === "dni" ? nextValue : getInput<HTMLInputElement>("dni").value;
-        renderProfileSuggestions(`${name} ${dni}`);
-      }
       if (field === "insurance") {
         renderTextSuggestions(
           "insurance-suggestions",
@@ -922,88 +784,20 @@ const setupFieldListeners = () => {
     );
   });
 
-  ["fullName", "dni"].forEach((id) => {
-    getInput<HTMLInputElement>(id).addEventListener("focus", () => {
-      const name = getInput<HTMLInputElement>("fullName").value;
-      const dni = getInput<HTMLInputElement>("dni").value;
-      renderProfileSuggestions(`${name} ${dni}`);
-    });
-  });
-
-  ["insurance", "referralDoctor", "fullName", "dni"].forEach((id) => {
+  ["insurance", "referralDoctor"].forEach((id) => {
     getInput<HTMLElement>(id).addEventListener("blur", () => {
       window.setTimeout(() => {
         if (id === "insurance") {
           hideSuggestions("insurance-suggestions");
-        } else if (id === "referralDoctor") {
-          hideSuggestions("doctor-suggestions");
         } else {
-          hideSuggestions("profile-suggestions");
+          hideSuggestions("doctor-suggestions");
         }
       }, 120);
     });
   });
 };
 
-const setupActionListeners = () => {
-  getInput<HTMLButtonElement>("save-button").addEventListener("click", () => {
-    persistCurrentRecord();
-  });
-
-  getInput<HTMLButtonElement>("quick-add-insurance").addEventListener("click", () => {
-    quickAddCurrentValue("insurances");
-  });
-
-  getInput<HTMLButtonElement>("quick-add-doctor").addEventListener("click", () => {
-    quickAddCurrentValue("doctors");
-  });
-
-  getInput<HTMLButtonElement>("save-print-button").addEventListener("click", () => {
-    if (!validateBeforeOutput()) {
-      return;
-    }
-    persistCurrentRecord();
-    setStatus("Ficha guardada. Abriendo impresion.");
-    window.print();
-  });
-
-  getInput<HTMLButtonElement>("print-button").addEventListener("click", () => {
-    if (!validateBeforeOutput()) {
-      return;
-    }
-    persistCurrentRecord();
-    setStatus("Abriendo impresion.");
-    window.print();
-  });
-
-  getInput<HTMLButtonElement>("docx-button").addEventListener("click", async () => {
-    if (!validateBeforeOutput()) {
-      return;
-    }
-    persistCurrentRecord();
-    await createDocx();
-    setStatus("Word generado.");
-  });
-
-  getInput<HTMLButtonElement>("reset-button").addEventListener("click", () => {
-    resetForm();
-  });
-};
-
-const setupSuggestions = () => {
-  getInput<HTMLDivElement>("profile-suggestions").addEventListener("click", (event) => {
-    const target = event.target as HTMLElement;
-    const button = target.closest<HTMLButtonElement>("[data-action='load-profile']");
-    if (!button?.dataset.id) {
-      return;
-    }
-    const profile = state.profiles.find((item) => item.id === button.dataset.id);
-    if (!profile) {
-      return;
-    }
-    loadProfileIntoForm(profile);
-  });
-
+const setupSuggestionClicks = () => {
   getInput<HTMLDivElement>("insurance-suggestions").addEventListener("click", (event) => {
     const target = event.target as HTMLElement;
     const button = target.closest<HTMLButtonElement>("[data-action='choose-insurance']");
@@ -1031,51 +825,43 @@ const setupSuggestions = () => {
   });
 };
 
-const setupRecentRecords = () => {
-  getInput<HTMLDivElement>("recent-records").addEventListener("click", (event) => {
-    const target = event.target as HTMLElement;
-    if (target.tagName !== "BUTTON") {
+const setupActionListeners = () => {
+  getInput<HTMLButtonElement>("quick-add-insurance").addEventListener("click", () => {
+    quickAddCurrentValue("insurances");
+  });
+
+  getInput<HTMLButtonElement>("quick-add-doctor").addEventListener("click", () => {
+    quickAddCurrentValue("doctors");
+  });
+
+  getInput<HTMLButtonElement>("save-print-button").addEventListener("click", () => {
+    if (!validateBeforeOutput()) {
       return;
     }
+    setStatus("Datos listos. Abriendo impresion.");
+    saveState();
+    window.print();
+  });
 
-    const action = target.dataset.action;
-    const recordId = target.dataset.id;
-    if (!action || !recordId) {
+  getInput<HTMLButtonElement>("print-button").addEventListener("click", () => {
+    if (!validateBeforeOutput()) {
       return;
     }
+    setStatus("Abriendo impresion.");
+    saveState();
+    window.print();
+  });
 
-    if (action === "load-record") {
-      const record = state.recentRecords.find((item) => item.id === recordId);
-      if (!record) {
-        return;
-      }
-
-      state.form = {
-        fullName: record.fullName,
-        dni: record.dni,
-        birthDate: record.birthDate,
-        age: record.age,
-        smoker: record.smoker,
-        address: record.address,
-        phone: record.phone,
-        insurance: record.insurance,
-        referralDoctor: record.referralDoctor,
-        visitDate: record.visitDate
-      };
-      syncFormValues();
-      updateDerivedAge();
-      syncPreview();
-      saveState();
-      setStatus("Ficha cargada desde recientes.");
-      getInput<HTMLInputElement>("fullName").focus();
+  getInput<HTMLButtonElement>("docx-button").addEventListener("click", async () => {
+    if (!validateBeforeOutput()) {
+      return;
     }
+    await createDocx();
+    setStatus("Word generado.");
+  });
 
-    if (action === "delete-record") {
-      state.recentRecords = state.recentRecords.filter((item) => item.id !== recordId);
-      renderRecentRecords();
-      saveState();
-      setStatus("Ficha eliminada de recientes.");
-    }
+  getInput<HTMLButtonElement>("reset-button").addEventListener("click", () => {
+    resetForm();
   });
 };
 
@@ -1176,11 +962,10 @@ const setupEnterNavigation = () => {
     }
 
     event.preventDefault();
-
     const nextId = orderedIds[currentIndex + 1];
     if (!nextId) {
       if (validateBeforeOutput()) {
-        persistCurrentRecord();
+        saveState();
         window.print();
       }
       return;
@@ -1195,11 +980,9 @@ syncFormValues();
 updateDerivedAge();
 syncPreview();
 refreshTagLists();
-renderRecentRecords();
 saveState();
 setupFieldListeners();
+setupSuggestionClicks();
 setupActionListeners();
-setupSuggestions();
-setupRecentRecords();
 setupSettingsDialog();
 setupEnterNavigation();
