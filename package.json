@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.0",
-    "docx": "^9.5.1"
+    "docx": "^9.5.1",
+    "jspdf": "^4.2.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.2",

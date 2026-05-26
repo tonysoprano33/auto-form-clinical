@@ -12,6 +12,7 @@ import {
   VerticalAlign,
   WidthType
 } from "docx";
+import { jsPDF } from "jspdf";
 
 type YesNo = "Si" | "No";
 
@@ -546,19 +547,105 @@ const createFileName = (extension: string): string => {
   return `caratula-${name || "paciente"}.${extension}`;
 };
 
+const getPrintableRows = (): Array<[string, string]> => [
+  ["APELLIDO Y NOMBRE", state.form.fullName],
+  ["DNI", state.form.dni],
+  ["FECHA DE NACIMIENTO", state.form.birthDate],
+  ["EDAD", state.form.age],
+  ["FUMADOR", state.form.smoker],
+  ["DOMICILIO", state.form.address],
+  ["TELEFONO", state.form.phone],
+  ["OBRA SOCIAL", state.form.insurance],
+  ["DERIVA", state.form.referralDoctor],
+  ["FECHA", state.form.visitDate]
+];
+
+const createPdf = () => {
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4"
+  });
+
+  const rows = getPrintableRows();
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const left = 12;
+  const right = pageWidth - 12;
+  const contentWidth = right - left;
+  let y = 12;
+
+  pdf.setDrawColor(23, 49, 73);
+  pdf.setLineWidth(0.45);
+  pdf.roundedRect(left, y, contentWidth, 23, 4, 4);
+
+  pdf.setFont("times", "bold");
+  pdf.setFontSize(17);
+  pdf.setTextColor(14, 36, 56);
+  pdf.text("CENTRO RESPIRATORIO INTEGRAL", pageWidth / 2, y + 8.5, {
+    align: "center"
+  });
+
+  pdf.setFont("times", "normal");
+  pdf.setFontSize(9.5);
+  pdf.setTextColor(54, 88, 116);
+  pdf.text("Centro de diagnostico y evaluacion respiratoria", pageWidth / 2, y + 14, {
+    align: "center"
+  });
+
+  pdf.setFont("times", "bold");
+  pdf.setFontSize(9.2);
+  pdf.setTextColor(23, 41, 55);
+  pdf.text("Marconi 147 · Tel. 02657-705270 · Villa Mercedes (San Luis)", pageWidth / 2, y + 19, {
+    align: "center"
+  });
+
+  pdf.setDrawColor(41, 80, 111);
+  pdf.setLineWidth(0.2);
+  pdf.line(left + 7, y + 21, right - 7, y + 21);
+
+  y += 31;
+
+  rows.forEach(([label, value]) => {
+    pdf.setFont("times", "bold");
+    pdf.setFontSize(10.7);
+    pdf.setTextColor(16, 40, 63);
+    pdf.text(`${label}:`, left, y);
+
+    const lines = pdf.splitTextToSize(value || " ", contentWidth);
+    pdf.setFont("times", "bold");
+    pdf.setFontSize(10.4);
+    pdf.setTextColor(27, 47, 63);
+    pdf.text(lines, left, y + 6.2);
+
+    const blockHeight = 11 + Math.max(0, lines.length - 1) * 4.6;
+    pdf.setDrawColor(209, 219, 229);
+    pdf.setLineWidth(0.2);
+    pdf.line(left, y + blockHeight, right, y + blockHeight);
+    y += blockHeight + 5.5;
+  });
+
+  return pdf;
+};
+
+const openPdfPrint = async () => {
+  const pdf = createPdf();
+  pdf.autoPrint();
+  const blob = pdf.output("blob");
+  const blobUrl = URL.createObjectURL(blob);
+  const popup = window.open(blobUrl, "_blank", "noopener,noreferrer");
+
+  if (!popup) {
+    URL.revokeObjectURL(blobUrl);
+    throw new Error("popup-blocked");
+  }
+
+  window.setTimeout(() => {
+    URL.revokeObjectURL(blobUrl);
+  }, 60_000);
+};
+
 const createDocx = async () => {
-  const rows = [
-    ["APELLIDO Y NOMBRE", state.form.fullName],
-    ["DNI", state.form.dni],
-    ["FECHA DE NACIMIENTO", state.form.birthDate],
-    ["EDAD", state.form.age],
-    ["FUMADOR", state.form.smoker],
-    ["DOMICILIO", state.form.address],
-    ["TELEFONO", state.form.phone],
-    ["OBRA SOCIAL", state.form.insurance],
-    ["DERIVA", state.form.referralDoctor],
-    ["FECHA", state.form.visitDate]
-  ];
+  const rows = getPrintableRows();
 
   const doc = new Document({
     sections: [
@@ -794,18 +881,30 @@ const setupActionListeners = () => {
     if (!validateBeforeOutput()) {
       return;
     }
-    setStatus("Datos listos. Abriendo impresion.");
+    setStatus("Datos listos. Generando PDF para imprimir.");
     saveState();
-    window.print();
+    void openPdfPrint()
+      .then(() => {
+        setStatus("PDF de impresion abierto.");
+      })
+      .catch(() => {
+        setStatus("El navegador bloqueo la ventana. Permite pop-ups para imprimir.");
+      });
   });
 
   getInput<HTMLButtonElement>("print-button").addEventListener("click", () => {
     if (!validateBeforeOutput()) {
       return;
     }
-    setStatus("Abriendo impresion.");
+    setStatus("Generando PDF para imprimir.");
     saveState();
-    window.print();
+    void openPdfPrint()
+      .then(() => {
+        setStatus("PDF de impresion abierto.");
+      })
+      .catch(() => {
+        setStatus("El navegador bloqueo la ventana. Permite pop-ups para imprimir.");
+      });
   });
 
   getInput<HTMLButtonElement>("docx-button").addEventListener("click", async () => {
@@ -922,7 +1021,13 @@ const setupEnterNavigation = () => {
     if (!nextId) {
       if (validateBeforeOutput()) {
         saveState();
-        window.print();
+        void openPdfPrint()
+          .then(() => {
+            setStatus("PDF de impresion abierto.");
+          })
+          .catch(() => {
+            setStatus("El navegador bloqueo la ventana. Permite pop-ups para imprimir.");
+          });
       }
       return;
     }
