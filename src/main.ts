@@ -188,7 +188,7 @@ const escapeHtml = (value: string): string =>
 const renderPreviewRow = (label: string, value: string) => `
   <div class="sheet-row">
     <p class="sheet-label">${label}:</p>
-    <p class="sheet-value">${escapeHtml(value || "........................................................................")}</p>
+    <p class="sheet-value">${escapeHtml(value || " ")}</p>
   </div>
 `;
 
