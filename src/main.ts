@@ -577,47 +577,47 @@ const createDocx = async () => {
                     width: { size: 100, type: WidthType.PERCENTAGE },
                     verticalAlign: VerticalAlign.CENTER,
                     borders: {
-                      top: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
-                      bottom: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
-                      right: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
-                      left: { style: BorderStyle.SINGLE, size: 10, color: "15324A" }
+                      top: { style: BorderStyle.SINGLE, size: 12, color: "10283F" },
+                      bottom: { style: BorderStyle.SINGLE, size: 12, color: "10283F" },
+                      right: { style: BorderStyle.SINGLE, size: 12, color: "10283F" },
+                      left: { style: BorderStyle.SINGLE, size: 12, color: "10283F" }
                     },
                     children: [
                       new Paragraph({
                         alignment: AlignmentType.CENTER,
-                        spacing: { before: 160, after: 70 },
+                        spacing: { before: 180, after: 60 },
                         children: [
                           new TextRun({
                             text: "CENTRO RESPIRATORIO INTEGRAL",
                             bold: true,
-                            size: 30,
-                            color: "12263B",
+                            size: 32,
+                            color: "0F2438",
                             font: "Cambria"
                           })
                         ]
                       }),
                       new Paragraph({
                         alignment: AlignmentType.CENTER,
-                        spacing: { after: 70 },
+                        spacing: { after: 65 },
                         children: [
                           new TextRun({
                             text: "Centro de diagnostico y evaluacion respiratoria",
                             italics: true,
-                            size: 20,
-                            color: "48657D",
+                            size: 19,
+                            color: "446276",
                             font: "Cambria"
                           })
                         ]
                       }),
                       new Paragraph({
                         alignment: AlignmentType.CENTER,
-                        spacing: { after: 160 },
+                        spacing: { after: 180 },
                         children: [
                           new TextRun({
                             text: "Marconi 147 - Tel. 02657-705270 - Villa Mercedes (San Luis)",
                             bold: true,
                             size: 22,
-                            color: "12263B",
+                            color: "0F2438",
                             font: "Cambria"
                           })
                         ]
@@ -630,25 +630,26 @@ const createDocx = async () => {
           }),
           ...rows.flatMap(([label, value]) => [
             new Paragraph({
-              spacing: { before: 250, after: 34 },
+              spacing: { before: 240, after: 28 },
               children: [
                 new TextRun({
                   text: `${label}:`,
                   bold: true,
                   underline: {},
-                  size: 24,
-                  color: "12263B",
+                  size: 25,
+                  color: "10283F",
                   font: "Cambria"
                 })
               ]
             }),
             new Paragraph({
-              spacing: { after: 18 },
+              spacing: { after: 12 },
               children: [
                 new TextRun({
                   text: value || " ",
                   size: 24,
-                  color: "1F2D3A",
+                  bold: true,
+                  color: "1E2C38",
                   font: "Cambria"
                 })
               ]
