@@ -266,32 +266,18 @@ h1 {
 
 .sheet-header-pro {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: 1fr;
+  gap: 10px;
   align-items: center;
   border: 2px solid #1b3148;
   border-radius: 22px;
-  padding: 18px 22px;
+  padding: 20px 24px;
   background: linear-gradient(180deg, #fbfdff 0%, #f0f6fb 100%);
-}
-
-.sheet-badge {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  border: 2px solid #1b3148;
-  display: grid;
-  place-items: center;
-  background: radial-gradient(circle at top, #eaf4fb 0%, #dceaf5 100%);
-  font-family: "Cambria", "Times New Roman", serif;
-  color: #16344b;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  font-size: 1.6rem;
 }
 
 .sheet-header-copy {
   font-family: "Cambria", "Times New Roman", serif;
+  text-align: center;
 }
 
 .sheet-header-copy h2 {
@@ -496,14 +482,7 @@ h1 {
   }
 
   .sheet-header-pro {
-    grid-template-columns: 1fr;
-    justify-items: center;
     text-align: center;
-  }
-
-  .sheet-badge {
-    width: 82px;
-    height: 82px;
   }
 
   .sheet-header-copy h2 {

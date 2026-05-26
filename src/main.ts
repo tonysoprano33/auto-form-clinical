@@ -287,9 +287,6 @@ const renderApp = () => {
         </div>
         <article class="print-sheet" id="print-sheet">
           <header class="sheet-header sheet-header-pro">
-            <div class="sheet-badge">
-              <span>CRI</span>
-            </div>
             <div class="sheet-header-copy">
               <h2>CENTRO RESPIRATORIO INTEGRAL</h2>
               <p>Centro de diagnostico y evaluacion respiratoria</p>
@@ -577,51 +574,13 @@ const createDocx = async () => {
               new TableRow({
                 children: [
                   new TableCell({
-                    width: { size: 20, type: WidthType.PERCENTAGE },
-                    verticalAlign: VerticalAlign.CENTER,
-                    borders: {
-                      top: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
-                      bottom: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
-                      left: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
-                      right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }
-                    },
-                    children: [
-                      new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        spacing: { before: 220, after: 100 },
-                        children: [
-                          new TextRun({
-                            text: "CRI",
-                            bold: true,
-                            size: 44,
-                            color: "15324A",
-                            font: "Cambria"
-                          })
-                        ]
-                      }),
-                      new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 220 },
-                        children: [
-                          new TextRun({
-                            text: "Respiratorio",
-                            italics: true,
-                            size: 18,
-                            color: "48657D",
-                            font: "Cambria"
-                          })
-                        ]
-                      })
-                    ]
-                  }),
-                  new TableCell({
-                    width: { size: 80, type: WidthType.PERCENTAGE },
+                    width: { size: 100, type: WidthType.PERCENTAGE },
                     verticalAlign: VerticalAlign.CENTER,
                     borders: {
                       top: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
                       bottom: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
                       right: { style: BorderStyle.SINGLE, size: 10, color: "15324A" },
-                      left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }
+                      left: { style: BorderStyle.SINGLE, size: 10, color: "15324A" }
                     },
                     children: [
                       new Paragraph({
