@@ -171,6 +171,7 @@ h1 {
 .field {
   display: grid;
   gap: 8px;
+  position: relative;
 }
 
 .field-wide {
@@ -372,6 +373,50 @@ h1 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
+}
+
+.suggestion-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  z-index: 20;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 16px;
+  border: 1px solid #d4e1ea;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 34px rgba(16, 32, 51, 0.14);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.suggestion-item {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 12px;
+  background: #f3f7fb;
+  color: #17384f;
+  text-align: left;
+}
+
+.suggestion-item:hover {
+  background: #e4eef6;
+}
+
+.suggestion-item span {
+  color: #5c6f80;
+  font-size: 0.9rem;
+}
+
+.profile-item strong {
+  font-size: 0.96rem;
 }
 
 @media (max-width: 1120px) {

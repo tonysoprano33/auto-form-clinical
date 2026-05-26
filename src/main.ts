@@ -32,6 +32,11 @@ type SavedRecord = PatientForm & {
   savedAt: string;
 };
 
+type PatientProfile = PatientForm & {
+  id: string;
+  updatedAt: string;
+};
+
 type AppConfig = {
   insurances: string[];
   doctors: string[];
@@ -41,6 +46,7 @@ type AppState = {
   form: PatientForm;
   config: AppConfig;
   recentRecords: SavedRecord[];
+  profiles: PatientProfile[];
 };
 
 const STORAGE_KEY = "clinica-caratula-state";
@@ -58,6 +64,13 @@ const defaultConfig: AppConfig = {
   doctors: ["DR GUSTAVO PIGUILLEM", "Dr. Juan Perez", "Dra. Maria Gomez"]
 };
 
+const formatDateForInput = (date: Date): string => {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear());
+  return `${day}/${month}/${year}`;
+};
+
 const createToday = (): string => formatDateForInput(new Date());
 
 const defaultForm = (): PatientForm => ({
@@ -73,11 +86,74 @@ const defaultForm = (): PatientForm => ({
   visitDate: createToday()
 });
 
+const mergeUniqueValues = (
+  currentValues: string[] | undefined,
+  baseValues: string[]
+): string[] => {
+  const merged = [...(currentValues || []), ...baseValues]
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return [...new Set(merged)];
+};
+
+const normalizeDateInput = (raw: string): string => {
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) {
+    return digits;
+  }
+  if (digits.length <= 4) {
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  }
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
+const formatDniInput = (raw: string): string => {
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+};
+
+const parseDate = (value: string): Date | null => {
+  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) {
+    return null;
+  }
+
+  const [, dd, mm, yyyy] = match;
+  const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+  const valid =
+    date.getFullYear() === Number(yyyy) &&
+    date.getMonth() === Number(mm) - 1 &&
+    date.getDate() === Number(dd);
+
+  return valid ? date : null;
+};
+
+const calculateAge = (birthDate: string, visitDate: string): string => {
+  const birth = parseDate(birthDate);
+  const visit = parseDate(visitDate);
+  if (!birth || !visit) {
+    return "";
+  }
+
+  let age = visit.getFullYear() - birth.getFullYear();
+  const monthDiff = visit.getMonth() - birth.getMonth();
+  const beforeBirthday =
+    monthDiff < 0 ||
+    (monthDiff === 0 && visit.getDate() < birth.getDate());
+
+  if (beforeBirthday) {
+    age -= 1;
+  }
+
+  return age >= 0 ? String(age) : "";
+};
+
 const loadState = (): AppState => {
   const fallbackState: AppState = {
     form: defaultForm(),
     config: defaultConfig,
-    recentRecords: []
+    recentRecords: [],
+    profiles: []
   };
 
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -88,10 +164,7 @@ const loadState = (): AppState => {
   try {
     const parsed = JSON.parse(raw) as Partial<AppState>;
     const config: AppConfig = {
-      insurances: mergeUniqueValues(
-        parsed.config?.insurances,
-        defaultConfig.insurances
-      ),
+      insurances: mergeUniqueValues(parsed.config?.insurances, defaultConfig.insurances),
       doctors: mergeUniqueValues(parsed.config?.doctors, defaultConfig.doctors)
     };
 
@@ -105,9 +178,20 @@ const loadState = (): AppState => {
         }))
       : [];
 
+    const profiles = Array.isArray(parsed.profiles)
+      ? parsed.profiles.map((profile) => ({
+          ...defaultForm(),
+          ...profile,
+          smoker: (profile.smoker === "Si" ? "Si" : "No") as YesNo,
+          id: profile.id || crypto.randomUUID(),
+          updatedAt: profile.updatedAt || new Date().toISOString()
+        }))
+      : [];
+
     return {
       config,
       recentRecords,
+      profiles,
       form: {
         ...defaultForm(),
         ...parsed.form,
@@ -129,6 +213,14 @@ if (!app) {
   throw new Error("No se encontro el contenedor principal.");
 }
 
+const escapeHtml = (value: string): string =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
 const renderPreviewRow = (label: string, value: string) => `
   <div class="sheet-row">
     <p class="sheet-label">${label}:</p>
@@ -145,7 +237,7 @@ const renderApp = () => {
             <p class="eyebrow">Clinica respiratoria</p>
             <h1>Caratula lista para imprimir</h1>
             <p class="panel-copy">
-              Formulario rapido, letra clara y fichas recientes para no cargar dos veces lo mismo.
+              Formulario rapido, letra clara y perfiles reutilizables para no cargar dos veces lo mismo.
             </p>
           </div>
           <button id="open-settings" class="ghost-button" type="button">Editar listas</button>
@@ -155,6 +247,7 @@ const renderApp = () => {
           <label class="field field-wide">
             <span>Apellido y nombre</span>
             <input id="fullName" name="fullName" type="text" maxlength="90" placeholder="Ej: Perez, Marta Alicia" />
+            <div id="profile-suggestions" class="suggestion-list hidden"></div>
           </label>
 
           <div class="field-grid">
@@ -199,18 +292,18 @@ const renderApp = () => {
             <label class="field">
               <span>Obra social</span>
               <div class="inline-pick">
-                <input id="insurance" name="insurance" list="insurance-options" type="text" placeholder="Elegir o escribir" />
+                <input id="insurance" name="insurance" type="text" placeholder="Elegir o escribir" />
                 <button id="quick-add-insurance" class="ghost-button small-button" type="button">Agregar</button>
               </div>
-              <datalist id="insurance-options"></datalist>
+              <div id="insurance-suggestions" class="suggestion-list hidden"></div>
             </label>
             <label class="field">
               <span>Deriva</span>
               <div class="inline-pick">
-                <input id="referralDoctor" name="referralDoctor" list="doctor-options" type="text" placeholder="Elegir o escribir" />
+                <input id="referralDoctor" name="referralDoctor" type="text" placeholder="Elegir o escribir" />
                 <button id="quick-add-doctor" class="ghost-button small-button" type="button">Agregar</button>
               </div>
-              <datalist id="doctor-options"></datalist>
+              <div id="doctor-suggestions" class="suggestion-list hidden"></div>
             </label>
           </div>
 
@@ -299,80 +392,6 @@ const renderApp = () => {
   `;
 };
 
-const saveState = () => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-};
-
-function formatDateForInput(date: Date): string {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = String(date.getFullYear());
-  return `${day}/${month}/${year}`;
-}
-
-const mergeUniqueValues = (
-  currentValues: string[] | undefined,
-  baseValues: string[]
-): string[] => {
-  const merged = [...(currentValues || []), ...baseValues]
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  return [...new Set(merged)];
-};
-
-const normalizeDateInput = (raw: string): string => {
-  const digits = raw.replace(/\D/g, "").slice(0, 8);
-  if (digits.length <= 2) {
-    return digits;
-  }
-  if (digits.length <= 4) {
-    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  }
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-};
-
-const formatDniInput = (raw: string): string => {
-  const digits = raw.replace(/\D/g, "").slice(0, 8);
-  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-};
-
-const parseDate = (value: string): Date | null => {
-  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!match) {
-    return null;
-  }
-
-  const [, dd, mm, yyyy] = match;
-  const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
-  const valid =
-    date.getFullYear() === Number(yyyy) &&
-    date.getMonth() === Number(mm) - 1 &&
-    date.getDate() === Number(dd);
-
-  return valid ? date : null;
-};
-
-const calculateAge = (birthDate: string, visitDate: string): string => {
-  const birth = parseDate(birthDate);
-  const visit = parseDate(visitDate);
-  if (!birth || !visit) {
-    return "";
-  }
-
-  let age = visit.getFullYear() - birth.getFullYear();
-  const monthDiff = visit.getMonth() - birth.getMonth();
-  const beforeBirthday =
-    monthDiff < 0 ||
-    (monthDiff === 0 && visit.getDate() < birth.getDate());
-
-  if (beforeBirthday) {
-    age -= 1;
-  }
-
-  return age >= 0 ? String(age) : "";
-};
-
 const getInput = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id) as T | null;
   if (!element) {
@@ -381,16 +400,24 @@ const getInput = <T extends HTMLElement>(id: string): T => {
   return element;
 };
 
-const escapeHtml = (value: string): string =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+const saveState = () => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+};
 
 const setStatus = (message: string) => {
   getInput<HTMLParagraphElement>("status-message").textContent = message;
+};
+
+const hideSuggestions = (id: string) => {
+  const container = getInput<HTMLDivElement>(id);
+  container.classList.add("hidden");
+  container.innerHTML = "";
+};
+
+const showSuggestions = (id: string, html: string) => {
+  const container = getInput<HTMLDivElement>(id);
+  container.innerHTML = html;
+  container.classList.remove("hidden");
 };
 
 const syncPreview = () => {
@@ -414,23 +441,6 @@ const syncPreview = () => {
   ].join("");
 };
 
-const syncSuggestionLists = () => {
-  getInput<HTMLDataListElement>("insurance-options").innerHTML = state.config.insurances
-    .map((insurance) => `<option value="${escapeHtml(insurance)}"></option>`)
-    .join("");
-
-  getInput<HTMLDataListElement>("doctor-options").innerHTML = state.config.doctors
-    .map((doctor) => `<option value="${escapeHtml(doctor)}"></option>`)
-    .join("");
-
-  if (!state.form.insurance) {
-    state.form.insurance = state.config.insurances[0];
-  }
-  if (!state.form.referralDoctor) {
-    state.form.referralDoctor = state.config.doctors[0];
-  }
-};
-
 const syncFormValues = () => {
   getInput<HTMLInputElement>("fullName").value = state.form.fullName;
   getInput<HTMLInputElement>("dni").value = state.form.dni;
@@ -442,7 +452,6 @@ const syncFormValues = () => {
   getInput<HTMLInputElement>("visitDate").value = state.form.visitDate;
   getInput<HTMLInputElement>("insurance").value = state.form.insurance;
   getInput<HTMLInputElement>("referralDoctor").value = state.form.referralDoctor;
-  syncSuggestionLists();
 };
 
 const refreshTagLists = () => {
@@ -500,8 +509,6 @@ const updateDerivedAge = () => {
   getInput<HTMLInputElement>("age").value = state.form.age;
 };
 
-const isFormUseful = (): boolean => state.form.fullName.trim().length > 0;
-
 const addDynamicOption = (value: string, target: "insurances" | "doctors") => {
   const trimmed = value.trim();
   if (trimmed && !state.config[target].includes(trimmed)) {
@@ -510,35 +517,117 @@ const addDynamicOption = (value: string, target: "insurances" | "doctors") => {
   }
 };
 
-const quickAddCurrentValue = (target: "insurances" | "doctors") => {
-  if (target === "insurances") {
-    const value = getInput<HTMLInputElement>("insurance").value.trim();
-    if (!value) {
-      setStatus("Escribe una obra social antes de agregarla.");
-      return;
-    }
-    addDynamicOption(value, "insurances");
-    state.form.insurance = value;
-    syncSuggestionLists();
-    refreshTagLists();
-    syncPreview();
-    saveState();
-    setStatus("Obra social agregada a la lista.");
+const isFormUseful = (): boolean => state.form.fullName.trim().length > 0;
+
+const findMatchingProfiles = (query: string): PatientProfile[] => {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const queryDigits = normalizedQuery.replace(/\D/g, "");
+  return state.profiles
+    .filter((profile) => {
+      const byName = profile.fullName.toLowerCase().includes(normalizedQuery);
+      const byDni =
+        queryDigits.length >= 3 &&
+        profile.dni.replace(/\D/g, "").startsWith(queryDigits);
+      return byName || byDni;
+    })
+    .slice(0, 6);
+};
+
+const renderProfileSuggestions = (query: string) => {
+  const matches = findMatchingProfiles(query);
+  if (!matches.length) {
+    hideSuggestions("profile-suggestions");
     return;
   }
 
-  const value = getInput<HTMLInputElement>("referralDoctor").value.trim();
-  if (!value) {
-    setStatus("Escribe un medico antes de agregarlo.");
+  showSuggestions(
+    "profile-suggestions",
+    matches
+      .map(
+        (profile) => `
+          <button type="button" class="suggestion-item profile-item" data-action="load-profile" data-id="${profile.id}">
+            <strong>${escapeHtml(profile.fullName || "Sin nombre")}</strong>
+            <span>DNI ${escapeHtml(profile.dni || "-")} · ${escapeHtml(profile.phone || "Sin telefono")}</span>
+          </button>
+        `
+      )
+      .join("")
+  );
+};
+
+const renderTextSuggestions = (
+  targetId: string,
+  items: string[],
+  query: string,
+  action: string
+) => {
+  const normalized = query.trim().toLowerCase();
+  const filtered = items
+    .filter((item) => item.toLowerCase().includes(normalized))
+    .slice(0, 8);
+
+  if (!filtered.length) {
+    hideSuggestions(targetId);
     return;
   }
-  addDynamicOption(value, "doctors");
-  state.form.referralDoctor = value;
-  syncSuggestionLists();
-  refreshTagLists();
+
+  showSuggestions(
+    targetId,
+    filtered
+      .map(
+        (item) => `
+          <button type="button" class="suggestion-item" data-action="${action}" data-value="${escapeHtml(item)}">
+            ${escapeHtml(item)}
+          </button>
+        `
+      )
+      .join("")
+  );
+};
+
+const loadProfileIntoForm = (profile: PatientProfile) => {
+  state.form = {
+    ...profile,
+    visitDate: createToday()
+  };
+  syncFormValues();
+  updateDerivedAge();
   syncPreview();
   saveState();
-  setStatus("Medico agregado a la lista.");
+  hideSuggestions("profile-suggestions");
+  setStatus("Perfil del paciente cargado.");
+};
+
+const upsertProfile = () => {
+  if (!state.form.fullName.trim() && !state.form.dni.trim()) {
+    return;
+  }
+
+  const dniDigits = state.form.dni.replace(/\D/g, "");
+  const normalizedName = state.form.fullName.trim().toLowerCase();
+  const existingIndex = state.profiles.findIndex((profile) => {
+    const profileDniDigits = profile.dni.replace(/\D/g, "");
+    if (dniDigits && profileDniDigits) {
+      return dniDigits === profileDniDigits;
+    }
+    return normalizedName.length > 0 && profile.fullName.trim().toLowerCase() === normalizedName;
+  });
+
+  const nextProfile: PatientProfile = {
+    ...state.form,
+    id: existingIndex >= 0 ? state.profiles[existingIndex].id : crypto.randomUUID(),
+    updatedAt: new Date().toISOString()
+  };
+
+  if (existingIndex >= 0) {
+    state.profiles.splice(existingIndex, 1, nextProfile);
+  } else {
+    state.profiles.unshift(nextProfile);
+  }
 };
 
 const persistCurrentRecord = () => {
@@ -549,6 +638,7 @@ const persistCurrentRecord = () => {
 
   addDynamicOption(state.form.insurance, "insurances");
   addDynamicOption(state.form.referralDoctor, "doctors");
+  upsertProfile();
 
   const normalized: SavedRecord = {
     ...state.form,
@@ -568,11 +658,50 @@ const persistCurrentRecord = () => {
     )
   ].slice(0, RECENT_LIMIT);
 
-  syncSuggestionLists();
   renderRecentRecords();
+  refreshTagLists();
   saveState();
   setStatus("Ficha guardada en recientes.");
   return true;
+};
+
+const quickAddCurrentValue = (target: "insurances" | "doctors") => {
+  if (target === "insurances") {
+    const value = getInput<HTMLInputElement>("insurance").value.trim();
+    if (!value) {
+      setStatus("Escribe una obra social antes de agregarla.");
+      return;
+    }
+    addDynamicOption(value, "insurances");
+    state.form.insurance = value;
+    refreshTagLists();
+    saveState();
+    renderTextSuggestions(
+      "insurance-suggestions",
+      state.config.insurances,
+      value,
+      "choose-insurance"
+    );
+    setStatus("Obra social agregada a la lista.");
+    return;
+  }
+
+  const value = getInput<HTMLInputElement>("referralDoctor").value.trim();
+  if (!value) {
+    setStatus("Escribe un medico antes de agregarlo.");
+    return;
+  }
+  addDynamicOption(value, "doctors");
+  state.form.referralDoctor = value;
+  refreshTagLists();
+  saveState();
+  renderTextSuggestions(
+    "doctor-suggestions",
+    state.config.doctors,
+    value,
+    "choose-doctor"
+  );
+  setStatus("Medico agregado a la lista.");
 };
 
 const resetForm = () => {
@@ -584,6 +713,9 @@ const resetForm = () => {
   syncFormValues();
   syncPreview();
   saveState();
+  hideSuggestions("profile-suggestions");
+  hideSuggestions("insurance-suggestions");
+  hideSuggestions("doctor-suggestions");
   setStatus("Ficha nueva lista para cargar.");
   getInput<HTMLInputElement>("fullName").focus();
 };
@@ -600,6 +732,15 @@ const validateBeforeOutput = (): boolean => {
     return false;
   }
   return true;
+};
+
+const createFileName = (extension: string): string => {
+  const name = state.form.fullName
+    .trim()
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
+    .replace(/\s+/g, "-")
+    .toLowerCase();
+  return `caratula-${name || "paciente"}.${extension}`;
 };
 
 const createDocx = async () => {
@@ -701,15 +842,6 @@ const createDocx = async () => {
   URL.revokeObjectURL(url);
 };
 
-const createFileName = (extension: string): string => {
-  const name = state.form.fullName
-    .trim()
-    .replace(/[^\p{L}\p{N}\s-]/gu, "")
-    .replace(/\s+/g, "-")
-    .toLowerCase();
-  return `caratula-${name || "paciente"}.${extension}`;
-};
-
 const setupFieldListeners = () => {
   const textBindings: Array<[keyof PatientForm, string]> = [
     ["fullName", "fullName"],
@@ -739,6 +871,29 @@ const setupFieldListeners = () => {
       state.form[field] = nextValue as never;
       updateDerivedAge();
       syncPreview();
+
+      if (field === "fullName" || field === "dni") {
+        const name = field === "fullName" ? nextValue : getInput<HTMLInputElement>("fullName").value;
+        const dni = field === "dni" ? nextValue : getInput<HTMLInputElement>("dni").value;
+        renderProfileSuggestions(`${name} ${dni}`);
+      }
+      if (field === "insurance") {
+        renderTextSuggestions(
+          "insurance-suggestions",
+          state.config.insurances,
+          nextValue,
+          "choose-insurance"
+        );
+      }
+      if (field === "referralDoctor") {
+        renderTextSuggestions(
+          "doctor-suggestions",
+          state.config.doctors,
+          nextValue,
+          "choose-doctor"
+        );
+      }
+
       saveState();
     });
   }
@@ -747,6 +902,46 @@ const setupFieldListeners = () => {
     state.form.smoker = (event.currentTarget as HTMLSelectElement).value as YesNo;
     syncPreview();
     saveState();
+  });
+
+  getInput<HTMLInputElement>("insurance").addEventListener("focus", () => {
+    renderTextSuggestions(
+      "insurance-suggestions",
+      state.config.insurances,
+      getInput<HTMLInputElement>("insurance").value,
+      "choose-insurance"
+    );
+  });
+
+  getInput<HTMLInputElement>("referralDoctor").addEventListener("focus", () => {
+    renderTextSuggestions(
+      "doctor-suggestions",
+      state.config.doctors,
+      getInput<HTMLInputElement>("referralDoctor").value,
+      "choose-doctor"
+    );
+  });
+
+  ["fullName", "dni"].forEach((id) => {
+    getInput<HTMLInputElement>(id).addEventListener("focus", () => {
+      const name = getInput<HTMLInputElement>("fullName").value;
+      const dni = getInput<HTMLInputElement>("dni").value;
+      renderProfileSuggestions(`${name} ${dni}`);
+    });
+  });
+
+  ["insurance", "referralDoctor", "fullName", "dni"].forEach((id) => {
+    getInput<HTMLElement>(id).addEventListener("blur", () => {
+      window.setTimeout(() => {
+        if (id === "insurance") {
+          hideSuggestions("insurance-suggestions");
+        } else if (id === "referralDoctor") {
+          hideSuggestions("doctor-suggestions");
+        } else {
+          hideSuggestions("profile-suggestions");
+        }
+      }, 120);
+    });
   });
 };
 
@@ -792,6 +987,47 @@ const setupActionListeners = () => {
 
   getInput<HTMLButtonElement>("reset-button").addEventListener("click", () => {
     resetForm();
+  });
+};
+
+const setupSuggestions = () => {
+  getInput<HTMLDivElement>("profile-suggestions").addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+    const button = target.closest<HTMLButtonElement>("[data-action='load-profile']");
+    if (!button?.dataset.id) {
+      return;
+    }
+    const profile = state.profiles.find((item) => item.id === button.dataset.id);
+    if (!profile) {
+      return;
+    }
+    loadProfileIntoForm(profile);
+  });
+
+  getInput<HTMLDivElement>("insurance-suggestions").addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+    const button = target.closest<HTMLButtonElement>("[data-action='choose-insurance']");
+    if (!button?.dataset.value) {
+      return;
+    }
+    state.form.insurance = button.dataset.value;
+    getInput<HTMLInputElement>("insurance").value = button.dataset.value;
+    syncPreview();
+    saveState();
+    hideSuggestions("insurance-suggestions");
+  });
+
+  getInput<HTMLDivElement>("doctor-suggestions").addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+    const button = target.closest<HTMLButtonElement>("[data-action='choose-doctor']");
+    if (!button?.dataset.value) {
+      return;
+    }
+    state.form.referralDoctor = button.dataset.value;
+    getInput<HTMLInputElement>("referralDoctor").value = button.dataset.value;
+    syncPreview();
+    saveState();
+    hideSuggestions("doctor-suggestions");
   });
 };
 
@@ -866,7 +1102,6 @@ const setupSettingsDialog = () => {
       getInput<HTMLInputElement>("referralDoctor").value = value;
     }
 
-    syncSuggestionLists();
     refreshTagLists();
     syncPreview();
     saveState();
@@ -941,6 +1176,7 @@ const setupEnterNavigation = () => {
     }
 
     event.preventDefault();
+
     const nextId = orderedIds[currentIndex + 1];
     if (!nextId) {
       if (validateBeforeOutput()) {
@@ -963,6 +1199,7 @@ renderRecentRecords();
 saveState();
 setupFieldListeners();
 setupActionListeners();
+setupSuggestions();
 setupRecentRecords();
 setupSettingsDialog();
 setupEnterNavigation();
