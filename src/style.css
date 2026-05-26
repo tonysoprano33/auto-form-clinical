@@ -517,12 +517,19 @@ h1 {
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 8mm;
+  }
+
   :root {
     background: white;
   }
 
   body {
     background: white;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .panel-form,
@@ -549,6 +556,53 @@ h1 {
     box-shadow: none;
     border-radius: 0;
     margin: 0;
-    padding: 18mm 16mm 18mm;
+    padding: 8mm 9mm 10mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .sheet-header-pro {
+    gap: 6px;
+    border-width: 1.5px;
+    border-radius: 14px;
+    padding: 13px 16px 15px;
+  }
+
+  .sheet-header-pro::after {
+    left: 16px;
+    right: 16px;
+    bottom: 8px;
+  }
+
+  .sheet-header-copy h2 {
+    font-size: 1.58rem;
+    margin-bottom: 4px;
+  }
+
+  .sheet-header-copy p {
+    font-size: 0.85rem;
+  }
+
+  .sheet-header-copy p + p {
+    margin-top: 3px;
+  }
+
+  .sheet-body {
+    margin-top: 18px;
+    gap: 11px;
+  }
+
+  .sheet-row {
+    gap: 3px;
+    padding-bottom: 7px;
+  }
+
+  .sheet-label {
+    font-size: 0.98rem;
+  }
+
+  .sheet-value {
+    min-height: 20px;
+    font-size: 0.97rem;
   }
 }
