@@ -69,8 +69,8 @@ const defaultForm = (): PatientForm => ({
   smoker: "No",
   address: "",
   phone: "",
-  insurance: defaultConfig.insurances[0],
-  referralDoctor: defaultConfig.doctors[0],
+  insurance: "",
+  referralDoctor: "",
   visitDate: createToday()
 });
 
@@ -159,8 +159,8 @@ const loadState = (): AppState => {
       form: {
         ...defaultForm(),
         ...parsed.form,
-        insurance: parsed.form?.insurance || config.insurances[0],
-        referralDoctor: parsed.form?.referralDoctor || config.doctors[0],
+        insurance: parsed.form?.insurance?.trim() || "",
+        referralDoctor: parsed.form?.referralDoctor?.trim() || "",
         smoker: parsed.form?.smoker === "Si" ? "Si" : "No",
         visitDate: parsed.form?.visitDate || createToday()
       }
@@ -513,11 +513,7 @@ const quickAddCurrentValue = (target: "insurances" | "doctors") => {
 };
 
 const resetForm = () => {
-  state.form = {
-    ...defaultForm(),
-    insurance: state.config.insurances[0] || "",
-    referralDoctor: state.config.doctors[0] || ""
-  };
+  state.form = defaultForm();
   syncFormValues();
   syncPreview();
   saveState();
@@ -878,14 +874,14 @@ const setupSettingsDialog = () => {
     if (action === "remove-insurance" && state.config.insurances.length > 1) {
       state.config.insurances = state.config.insurances.filter((item) => item !== value);
       if (state.form.insurance === value) {
-        state.form.insurance = state.config.insurances[0];
+        state.form.insurance = "";
       }
     }
 
     if (action === "remove-doctor" && state.config.doctors.length > 1) {
       state.config.doctors = state.config.doctors.filter((item) => item !== value);
       if (state.form.referralDoctor === value) {
-        state.form.referralDoctor = state.config.doctors[0];
+        state.form.referralDoctor = "";
       }
     }
 
