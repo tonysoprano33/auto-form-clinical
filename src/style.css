@@ -519,7 +519,7 @@ h1 {
 @media print {
   @page {
     size: A4;
-    margin: 8mm;
+    margin: 3mm 7mm 6mm;
   }
 
   :root {
@@ -528,6 +528,7 @@ h1 {
 
   body {
     background: white;
+    margin: 0;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -556,7 +557,7 @@ h1 {
     box-shadow: none;
     border-radius: 0;
     margin: 0;
-    padding: 8mm 9mm 10mm;
+    padding: 2mm 8mm 8mm;
     break-inside: avoid;
     page-break-inside: avoid;
   }
